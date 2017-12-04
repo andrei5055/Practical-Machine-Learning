@@ -1,0 +1,110 @@
+---
+title: "Practical Machine Learning Course Project:"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Predicting the quality of exercises performed by using the data from smart wearable devices.
+
+####***by Andrei Ivanov***
+#####November 25, 2017
+
+##Introduction
+Using devices such as *Jawbone Up, Nike FuelBand*, and *Fitbit* it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement - a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how much of a particular activity they do, but they rarely quantify *how well they do it*.
+
+In this project, our goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information could be found in  the section on the Weight Lifting Exercise Dataset from: http://groupware.les.inf.puc-rio.br/har.
+
+
+##Data Loading
+
+Following function will be used for data loading:
+
+```{r}
+loadData <- function(link) {
+     data <- read.csv(link)
+     data <- data[, -c(1:7)]
+}
+```
+
+In that function we will also remove the columns 1-7 because they contain useless information for our analysis.
+
+Downloading the training and testing datasets from the Internet:
+
+```{r}
+training <- loadData('https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv')
+testing  <- loadData('https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv')
+```
+
+The training data has **`r nrow(training)`** columns (variables or features) and **`r ncol(training)`** rows  (observations) distributed among the following **`r length(table(training$classe))`** classes:
+```{r}
+table(training$classe)
+```
+
+
+##Data Cleaning and Feature Selection
+We should remove from ***training*** and ***testing*** all columns which contain at least one ***NA*** value
+```{r}
+validCol <- colSums(is.na(training)) == 0 & colSums(is.na(testing)) == 0
+testing  <- testing[, validCol]
+training <- training[, validCol]
+```
+
+##Data Processing and Training
+Let's divide the ***training*** set in two parts, first part will contain 75% of rows of the set and it will be used for training and the other part will be used for cross validation.
+
+```{r message=FALSE, warning=FALSE}
+library(caret)
+set.seed(12345)
+inTrain <- createDataPartition(training$classe, p=0.75, list=FALSE)
+subtraining <- training[inTrain,]
+crossvalid <- training[-inTrain,]
+```
+
+We will try to use and compare following two prediction models:
+
+###Decision Tree
+```{r message=FALSE, warning=FALSE}
+library(rpart)
+library(rpart.plot)
+model_1 <- rpart(classe ~ ., data=subtraining, method="class")
+```
+
+###Random Forest
+```{r message=FALSE, warning=FALSE}
+library(randomForest)
+model_2 <- randomForest(classe ~ ., data=subtraining)
+```
+
+##Validation of the models
+Let's validate two models predicting the values of the classe variable of the observations not used to compute the model. By comparing with the real values of the observations, we can evaluate the accuracy of the prediction:
+
+```{r}
+# Decision Tree
+confusionMatrix(crossvalid$classe, predict(model_1, crossvalid, type="class"))
+# Random Forest
+confusionMatrix(crossvalid$classe, predict(model_2, crossvalid))
+```
+
+As we could see, the Random Forest algorithm performed much better than Decision Tree.
+The accuracy for Random Forest model is 0.9949 (95% CI: (0.9925, 0.9967)) compared to 0.7229 (95% CI: (0.7101, 0.7354)) for Decision Tree model. 
+
+##Predicting the testing values
+Because the Random Forest model is much better , we will use it for prediction of testing values.
+
+```{r}
+predict(model_2, testing)
+```
+
+
+
+###Appendix:
+
+Here is the plot of the Classification Tree:
+```{r}
+rpart.plot(model_1, main="Classification Tree", extra = 102)
+```
+
+
+
